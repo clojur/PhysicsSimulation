@@ -21,6 +21,7 @@ public:
 	Body();
 
 	Vec3		m_position;
+	Vec3		m_velocity;
 	Quat		m_orientation;
 
 	Shape *		m_shape;

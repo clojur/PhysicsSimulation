@@ -503,10 +503,13 @@ void Application::MainLoop() {
 		}
 
 		bool runPhysics = true;
-		if ( m_isPaused ) {
+
+		if ( m_isPaused ) 
+		{
 			dt_us = 0.0f;
 			runPhysics = false;
-			if ( m_stepFrame ) {
+			if ( m_stepFrame ) 
+			{
 				dt_us = 16667.0f;
 				m_stepFrame = false;
 				runPhysics = true;
