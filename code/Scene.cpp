@@ -20,8 +20,8 @@ Scene::~Scene
 ====================================================
 */
 Scene::~Scene() {
-	for ( int i = 0; i < m_bodies.size(); i++ ) {
-		delete m_bodies[ i ].m_shape;
+	for (int i = 0; i < m_bodies.size(); i++) {
+		delete m_bodies[i].m_shape;
 	}
 	m_bodies.clear();
 }
@@ -32,8 +32,8 @@ Scene::Reset
 ====================================================
 */
 void Scene::Reset() {
-	for ( int i = 0; i < m_bodies.size(); i++ ) {
-		delete m_bodies[ i ].m_shape;
+	for (int i = 0; i < m_bodies.size(); i++) {
+		delete m_bodies[i].m_shape;
 	}
 	m_bodies.clear();
 
@@ -48,34 +48,55 @@ Scene::Initialize
 void Scene::Initialize()
 {
 	Body body;
-	body.m_position = Vec3( 0, 0, 10.0f );
-	body.m_orientation = Quat( 0, 0, 0, 1 );
-	body.m_shape = new ShapeSphere( 0.05f );
-	m_bodies.push_back( body );
 
+	// Dynamic Bodies
+	for (int x = 0; x < 6; x++) {
+		for (int y = 0; y < 6; y++) {
+			float radius = 0.5f;
+			float xx = float(x - 1) * radius * 1.5f;
+			float yy = float(y - 1) * radius * 1.5f;
+			body.m_position = Vec3(xx, yy, 10.0f);
+			body.m_orientation = Quat(0, 0, 0, 1);
+			body.m_linearVelocity.Zero();
+			body.m_invMass = 1.0f;
+			body.m_elasticity = 0.5f;
+			body.m_friction = 0.5f;
+			body.m_shape = new ShapeSphere(radius);
+			m_bodies.push_back(body);
+		}
+	}
 
-	body.m_position = Vec3(0, 0, 9.6f);
-	body.m_orientation = Quat(0, 0, 0, 1);
-	body.m_shape = new ShapeSphere(0.05f);
-	m_bodies.push_back(body);
+	// Static "floor"
+	for (int x = 0; x < 3; x++) {
+		for (int y = 0; y < 3; y++) {
+			float radius = 80.0f;
+			float xx = float(x - 1) * radius * 0.25f;
+			float yy = float(y - 1) * radius * 0.25f;
+			body.m_position = Vec3(xx, yy, -radius);
+			body.m_orientation = Quat(0, 0, 0, 1);
+			body.m_linearVelocity.Zero();
+			body.m_invMass = 0.0f;
+			body.m_elasticity = 0.99f;
+			body.m_friction = 0.5f;
+			body.m_shape = new ShapeSphere(radius);
+			m_bodies.push_back(body);
+		}
+	}
+}
 
-	body.m_position = Vec3(0, 0, 9.2f);
-	body.m_orientation = Quat(0, 0, 0, 1);
-	body.m_shape = new ShapeSphere(0.05f);
-	m_bodies.push_back(body);
+int CompareContacts(const void* p1, const void* p2) {
+	contact_t a = *(contact_t*)p1;
+	contact_t b = *(contact_t*)p2;
 
-	body.m_position = Vec3(0, 0, 8.8f);
-	body.m_orientation = Quat(0, 0, 0, 1);
-	body.m_shape = new ShapeSphere(0.05f);
-	m_bodies.push_back(body);
+	if (a.timeOfImpact < b.timeOfImpact) {
+		return -1;
+	}
 
-	body.m_position = Vec3( 0, 0, -1001 );
-	body.m_orientation = Quat( 0, 0, 0, 1 );
-	body.m_shape = new ShapeSphere( 1000.0f );
-	m_bodies.push_back( body );
+	if (a.timeOfImpact == b.timeOfImpact) {
+		return 0;
+	}
 
-
-	// TODO: Add code
+	return 1;
 }
 
 /*
@@ -83,69 +104,76 @@ void Scene::Initialize()
 Scene::Update
 ====================================================
 */
-void Scene::Update( const float dt_sec )
+void Scene::Update(const float dt_sec)
 {
-	// TODO: Add code
-	double timeStep = 0.01;
-	double temp_dt = timeStep;
-	float g = 9.8f;
-	float m = 0.1f;
-
-	float damping = 0.98f;
-	std::vector<Vec3> tempVelocitys, tempPositions;
-	for(int i = 0; i < m_bodies.size() - 1; ++i)
-	{
-		tempVelocitys.emplace_back(m_bodies[i].m_velocity);
-		tempPositions.emplace_back(m_bodies[i].m_position);
+	// Gravity impulse
+	for (int i = 0; i < m_bodies.size(); i++) {
+		Body* body = &m_bodies[i];
+		float mass = 1.0f / body->m_invMass;
+		Vec3 impulseGravity = Vec3(0, 0, -10) * mass * dt_sec;
+		body->ApplyImpulseLinear(impulseGravity);
 	}
 
-	//update position
-	if(temp_dt < dt_sec)
-	{
-		while(temp_dt < dt_sec)
-		{
-			for (int i = 0; i < m_bodies.size() - 1; ++i)
-			{
-				tempVelocitys[i] += Vec3(0, 0, -g) * timeStep * damping;
-				tempPositions[i] += tempVelocitys[i] * timeStep * damping;
-			}
-			temp_dt += timeStep;
-		}
-	}
-	else
-	{
-		for (int i = 0; i < m_bodies.size() - 1; ++i)
-		{
-			tempVelocitys[i] += Vec3(0, 0, -g) * timeStep * damping;
-			tempPositions[i] += tempVelocitys[i] * timeStep * damping;
-		}
-	}
 
-	//collision test
-	int groundIdx = m_bodies.size() - 1;
-	Vec3 gPos = m_bodies[groundIdx].m_position;
-	float gRadius = dynamic_cast<ShapeSphere*>(m_bodies[groundIdx].m_shape)->m_radius;
-	float epsilon = 0.005f;
-	for (int i = 0; i < groundIdx; ++i)
+	// Broadphase
+	std::vector< collisionPair_t > collisionPairs;
+	BroadPhase(m_bodies.data(), (int)m_bodies.size(), collisionPairs, dt_sec);
+
+
+	// NarrowPhase(perform actual collision detection)
+	int numContacts = 0;
+	const int maxContacts = m_bodies.size() * m_bodies.size();
+	contact_t* contacts = (contact_t*)alloca(sizeof(contact_t) * maxContacts);
+
+	for (int i = 0; i < collisionPairs.size(); i++) 
 	{
-		Vec3 groundToSphere = tempPositions[i] - gPos;
-		
-		float disFun= groundToSphere.GetLengthSqr()- (gRadius * gRadius);
+		const collisionPair_t& pair = collisionPairs[i];
+		Body* bodyA = &m_bodies[pair.a];
+		Body* bodyB = &m_bodies[pair.b];
 
-		//·¢ÉúÅö×²
-		if(disFun <= epsilon)
-		{
-			float r = dynamic_cast<ShapeSphere*>(m_bodies[groundIdx].m_shape)->m_radius;
-
-			m_bodies[i].m_position = gPos+(groundToSphere.Normalize()*(gRadius+0.05f));
-			m_bodies[i].m_velocity = Vec3();
+		// Skip body pairs with infinite mass
+		if (0.0f == bodyA->m_invMass && 0.0f == bodyB->m_invMass) {
+			continue;
 		}
-		else
-		{
-			m_bodies[i].m_position = tempPositions[i];
-			m_bodies[i].m_velocity = tempVelocitys[i];
+
+		contact_t contact;
+		if (Intersect(bodyA, bodyB, dt_sec, contact)) {
+			contacts[numContacts] = contact;
+			numContacts++;
 		}
 	}
 
 
+	// Sort the times of impact from first to last
+	if (numContacts > 1) {
+		qsort(contacts, numContacts, sizeof(contact_t), CompareContacts);
+	}
+
+	//
+	// Apply ballistic impulses
+	//
+	float accumulatedTime = 0.0f;
+	for (int i = 0; i < numContacts; i++) 
+	{
+		contact_t& contact = contacts[i];
+		const float dt = contact.timeOfImpact - accumulatedTime;
+
+		// Position update
+		for (int j = 0; j < m_bodies.size(); j++) 
+		{
+			m_bodies[j].Update(dt);
+		}
+
+		ResolveContact(contact);
+		accumulatedTime += dt;
+	}
+
+	// Update the positions for the rest of this frame's time
+	const float timeRemaining = dt_sec - accumulatedTime;
+	if (timeRemaining > 0.0f) {
+		for (int i = 0; i < m_bodies.size(); i++) 
+		{
+			m_bodies[i].Update(timeRemaining);
+		}
+	}
 }

@@ -376,12 +376,13 @@ Application::MouseMoved
 */
 void Application::MouseMoved( float x, float y )
 {
+	Vec2 newPosition = Vec2(x, y);
+	Vec2 ds = newPosition - m_mousePosition;
+	m_mousePosition = newPosition;
+
 	if (!m_isLeftButtonDown)
 		return;
 
-	Vec2 newPosition = Vec2( x, y );
-	Vec2 ds = newPosition - m_mousePosition;
-	m_mousePosition = newPosition;
 
 	float sensitivity = 0.01f;
 	m_cameraPositionTheta += ds.y * sensitivity;

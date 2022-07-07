@@ -128,7 +128,7 @@ void Scene::Update( const float dt_sec ) {
 	//
 	int numContacts = 0;
 	const int maxContacts = m_bodies.size() * m_bodies.size();
-	contact_t * contacts = (contact_t *)alloca( sizeof( contact_t ) * maxContacts );
+	contact_t* contacts = (contact_t *)alloca( sizeof( contact_t ) * maxContacts );
 	for ( int i = 0; i < collisionPairs.size(); i++ ) {
 		const collisionPair_t & pair = collisionPairs[ i ];
 		Body * bodyA = &m_bodies[ pair.a ];
