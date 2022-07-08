@@ -10,6 +10,64 @@ Intersect
 ====================================================
 */
 
+bool ConservativeAdvance(Body* bodyA, Body* bodyB, float dt, contact_t& contact)
+{
+	contact.bodyA = bodyA;
+	contact.bodyB = bodyB;
+
+	float toi = 0.0f;
+
+	int numIters = 0;
+
+	// Advance the positions of the bodies until they touch or there's not time left
+	while (dt > 0.0f) {
+		// Check for intersection
+		bool didIntersect = Intersect(bodyA, bodyB, contact);
+		if (didIntersect) {
+			contact.timeOfImpact = toi;
+			bodyA->Update(-toi);
+			bodyB->Update(-toi);
+			return true;
+		}
+
+		++numIters;
+		if (numIters > 10) {
+			break;
+		}
+
+		// Get the vector from the closest point on A to the closest point on B
+		Vec3 ab = contact.ptOnB_WorldSpace - contact.ptOnA_WorldSpace;
+		ab.Normalize();
+
+		// project the relative velocity onto the ray of shortest distance
+		Vec3 relativeVelocity = bodyA->m_linearVelocity - bodyB->m_linearVelocity;
+		float orthoSpeed = relativeVelocity.Dot(ab);
+
+		// Add to the orthoSpeed the maximum angular speeds of the relative shapes
+		float angularSpeedA = bodyA->m_shape->FastestLinearSpeed(bodyA->m_angularVelocity, ab);
+		float angularSpeedB = bodyB->m_shape->FastestLinearSpeed(bodyB->m_angularVelocity, ab * -1.0f);
+		orthoSpeed += angularSpeedA + angularSpeedB;
+		if (orthoSpeed <= 0.0f) {
+			break;
+		}
+
+		float timeToGo = contact.separationDistance / orthoSpeed;
+		if (timeToGo > dt) {
+			break;
+		}
+
+		dt -= timeToGo;
+		toi += timeToGo;
+		bodyA->Update(timeToGo);
+		bodyB->Update(timeToGo);
+	}
+
+	// unwind the clock
+	bodyA->Update(-toi);
+	bodyB->Update(-toi);
+	return false;
+}
+
 bool RaySphere(const Vec3& rayStart, const Vec3& rayDir, const Vec3& sphereCenter, const float sphereRadius, float& t1, float& t2)
 {
 	const Vec3 m = sphereCenter - rayStart;
@@ -130,6 +188,12 @@ bool Intersect( Body * bodyA, Body * bodyB, const float dt, contact_t & contact 
 			float r = ab.GetMagnitude() - (sphereA->m_radius + sphereB->m_radius);
 			contact.separationDistance = r;
 			return true;
+		}
+		else
+		{
+			// Use GJK to perform conservative advancement
+			bool result = ConservativeAdvance(bodyA, bodyB, dt, contact);
+			return result;
 		}
 	}
 	return false;

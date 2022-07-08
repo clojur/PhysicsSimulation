@@ -21,7 +21,10 @@ public:
 
 	void Reset();
 	void Initialize();
-	void Update( const float dt_sec );	
+	void Update( const float dt_sec );
+
+	void AddStandardSandBox(std::vector< Body >& bodies);
+	
 
 	std::vector< Body > m_bodies;
 	std::vector< Constraint * >	m_constraints;
